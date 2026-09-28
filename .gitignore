@@ -14,3 +14,8 @@ dist/
 .DS_Store
 coverage.xml
 htmlcov/
+
+# Backend environment files
+backend/.env
+backend/.env.*
+!backend/.env.example
