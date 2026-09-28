@@ -5,7 +5,7 @@ from .. import db
 from ..models.models import User, Skill, Goal, Milestone, PracticeSession, Post, Comment, Like, Follow, FileAsset
 from ..utils.auth import make_token, login_required
 from ..services.analytics import dashboard
-from ..services.storage import save_local, delete_local
+from ..services.storage import save_local, delete_local, get_storage
 
 api = Blueprint('api', __name__)
 

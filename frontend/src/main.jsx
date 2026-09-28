@@ -10,6 +10,238 @@ function Dashboard({stats,goals,skills}){if(!stats)return <p>Loading...</p>; con
 function Skills({skills,refresh}){const [f,setF]=useState({skill_name:'Photography',category:'Art',current_level:'BEGINNER',target_level:'INTERMEDIATE',description:''});const add=async()=>{try{await api('/skills',{method:'POST',body:JSON.stringify(f)});refresh()}catch(e){alert(e.message)}};return <><h2>Skills</h2><div className="panel formgrid">{Object.entries(f).map(([k,v])=><input placeholder={k} value={v} onChange={e=>setF({...f,[k]:e.target.value})}/>)}<button onClick={add}>Add Skill</button></div>{skills.map(s=><div className="panel"><b>{s.skill_name}</b> · {s.category} · {s.current_level} → {s.target_level}<p>{s.description}</p><button onClick={async()=>{await api(`/skills/${s.id}`,{method:'DELETE'});refresh()}}>Delete</button></div>)}</>}
 function Practice({skills,refresh}){const [f,setF]=useState({skill_id:'',duration_minutes:60,activity:'Practice session',notes:''});return <><h2>Log practice</h2><div className="panel formgrid"><select value={f.skill_id} onChange={e=>setF({...f,skill_id:e.target.value})}><option value="">Select skill</option>{skills.map(s=><option value={s.id}>{s.skill_name}</option>)}</select><input type="number" value={f.duration_minutes} onChange={e=>setF({...f,duration_minutes:e.target.value})}/><input value={f.activity} onChange={e=>setF({...f,activity:e.target.value})}/><textarea value={f.notes} onChange={e=>setF({...f,notes:e.target.value})}/><button onClick={async()=>{try{await api('/practice',{method:'POST',body:JSON.stringify(f)});refresh();alert('Practice logged')}catch(e){alert(e.message)}}}>Save session</button></div></>}
 function Goals({skills,goals,refresh}){const [f,setF]=useState({skill_id:'',title:'Practice 20 hours',target_value:20,unit:'hours',milestones:[5,10,20]});return <><h2>Goals & milestones</h2><div className="panel formgrid"><select value={f.skill_id} onChange={e=>setF({...f,skill_id:e.target.value})}><option value="">Select skill</option>{skills.map(s=><option value={s.id}>{s.skill_name}</option>)}</select><input value={f.title} onChange={e=>setF({...f,title:e.target.value})}/><input type="number" value={f.target_value} onChange={e=>setF({...f,target_value:e.target.value})}/><button onClick={async()=>{try{await api('/goals',{method:'POST',body:JSON.stringify(f)});refresh()}catch(e){alert(e.message)}}}>Create goal</button></div>{goals.map(g=><div className="panel"><b>{g.title}</b><div className="progress"><i style={{width:`${g.progress}%`}}/></div><p>{g.current_value.toFixed(1)} / {g.target_value} {g.unit} ({g.progress}%)</p>{g.milestones.map(m=><span className="pill">{m.achieved?'✓':'○'} {m.title}</span>)}</div>)}</>}
-function Community({feed,refresh}){const [content,setContent]=useState('');const post=async()=>{await api('/posts',{method:'POST',body:JSON.stringify({content})});setContent('');refresh()};return <><h2>Community</h2><div className="panel"><textarea placeholder="Share an achievement..." value={content} onChange={e=>setContent(e.target.value)}/><button onClick={post}>Post</button></div>{feed.map(p=><article className="panel"><b>@{p.user.username}</b><small> · {new Date(p.created_at).toLocaleString()}</small><p>{p.content}</p><button onClick={async()=>{await api(`/posts/${p.id}/like`,{method:'POST'});refresh()}}>♥ {p.likes}</button><button onClick={async()=>{const c=prompt('Comment');if(c)await api(`/posts/${p.id}/comments`,{method:'POST',body:JSON.stringify({content:c})});refresh()}}>Comment ({p.comments})</button></article>)}</>}
-function Profile({user,setUser}){const [f,setF]=useState(user);return <><h2>Profile</h2><div className="panel formgrid"><input value={f.name} onChange={e=>setF({...f,name:e.target.value})}/><input value={f.bio||''} placeholder="Bio" onChange={e=>setF({...f,bio:e.target.value})}/><input value={f.interests||''} placeholder="Interests" onChange={e=>setF({...f,interests:e.target.value})}/><button onClick={async()=>{const d=await api('/profile',{method:'PUT',body:JSON.stringify(f)});localStorage.setItem('user',JSON.stringify(d));setUser(d);alert('Saved')}}>Save</button></div></>}
+function Community({feed,refresh}){
+const [content,setContent]=useState('');
+const [file,setFile]=useState(null);
+const [posting,setPosting]=useState(false);
+
+const post=async()=>{
+if(!content.trim()&&!file){
+alert('Write something or attach a file');
+return;
+}
+
+```
+try{
+  setPosting(true);
+
+  const formData=new FormData();
+  formData.append('content',content);
+
+  if(file){
+    formData.append('file',file);
+  }
+
+  await api('/posts',{
+    method:'POST',
+    body:formData
+  });
+
+  setContent('');
+  setFile(null);
+
+  const input=document.getElementById('post-file');
+  if(input) input.value='';
+
+  refresh();
+}catch(e){
+  alert(e.message);
+}finally{
+  setPosting(false);
+}
+```
+
+};
+
+return <> <h2>Community</h2>
+
+```
+<div className="panel">
+  <textarea
+    placeholder="Share an achievement..."
+    value={content}
+    onChange={e=>setContent(e.target.value)}
+  />
+
+  <input
+    id="post-file"
+    type="file"
+    accept="image/jpeg,image/png,image/webp,application/pdf"
+    onChange={e=>setFile(e.target.files?.[0]||null)}
+  />
+
+  {file&&(
+    <p>
+      Selected file: <b>{file.name}</b>
+    </p>
+  )}
+
+  <button onClick={post} disabled={posting}>
+    {posting?'Posting...':'Post'}
+  </button>
+</div>
+
+{feed.map(p=>
+  <article className="panel" key={p.id}>
+    <b>@{p.user.username}</b>
+    <small> · {new Date(p.created_at).toLocaleString()}</small>
+
+    <p>{p.content}</p>
+
+    {p.media_url&&(
+      <div style={{margin:'12px 0'}}>
+        {/\.(jpg|jpeg|png|webp)$/i.test(p.media_url)?(
+          <img
+            src={`http://127.0.0.1:5000${p.media_url}`}
+            alt="Post attachment"
+            style={{
+              maxWidth:'100%',
+              maxHeight:'400px',
+              borderRadius:'10px'
+            }}
+          />
+        ):(
+          <a
+            href={`http://127.0.0.1:5000${p.media_url}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            📎 View attachment
+          </a>
+        )}
+      </div>
+    )}
+
+    <button
+      onClick={async()=>{
+        await api(`/posts/${p.id}/like`,{method:'POST'});
+        refresh();
+      }}
+    >
+      ♥ {p.likes}
+    </button>
+
+    <button
+      onClick={async()=>{
+        const c=prompt('Comment');
+        if(c){
+          await api(`/posts/${p.id}/comments`,{
+            method:'POST',
+            body:JSON.stringify({content:c})
+          });
+          refresh();
+        }
+      }}
+    >
+      Comment ({p.comments})
+    </button>
+  </article>
+)}
+```
+
+</>;
+}
+
+function Profile({user,setUser}){
+const [f,setF]=useState(user);
+const [file,setFile]=useState(null);
+const [uploading,setUploading]=useState(false);
+
+const save=async()=>{
+try{
+const d=await api('/profile',{
+method:'PUT',
+body:JSON.stringify(f)
+});
+localStorage.setItem('user',JSON.stringify(d));
+setUser(d);
+alert('Profile saved');
+}catch(e){
+alert(e.message);
+}
+};
+
+const uploadAvatar=async()=>{
+if(!file)return;
+
+```
+try{
+  setUploading(true);
+
+  const formData=new FormData();
+  formData.append('file',file);
+
+  const d=await api('/profile/avatar',{
+    method:'POST',
+    body:formData
+  });
+
+  const updated={...f,profile_picture:d.profile_picture};
+  setF(updated);
+  localStorage.setItem('user',JSON.stringify(updated));
+  setUser(updated);
+  setFile(null);
+
+  alert('Profile picture uploaded');
+}catch(e){
+  alert(e.message);
+}finally{
+  setUploading(false);
+}
+```
+
+};
+
+return <> <h2>Profile</h2>
+
+```
+<div className="panel formgrid">
+  {f.profile_picture&&(
+    <img
+      src={`http://127.0.0.1:5000${f.profile_picture}`}
+      alt="Profile"
+      style={{
+        width:'120px',
+        height:'120px',
+        borderRadius:'50%',
+        objectFit:'cover'
+      }}
+    />
+  )}
+
+  <input
+    type="file"
+    accept="image/jpeg,image/png,image/webp"
+    onChange={e=>setFile(e.target.files?.[0]||null)}
+  />
+
+  <button onClick={uploadAvatar} disabled={!file||uploading}>
+    {uploading?'Uploading...':'Upload profile picture'}
+  </button>
+
+  <input
+    value={f.name}
+    onChange={e=>setF({...f,name:e.target.value})}
+    placeholder="Name"
+  />
+
+  <input
+    value={f.bio||''}
+    placeholder="Bio"
+    onChange={e=>setF({...f,bio:e.target.value})}
+  />
+
+  <input
+    value={f.interests||''}
+    placeholder="Interests"
+    onChange={e=>setF({...f,interests:e.target.value})}
+  />
+
+  <button onClick={save}>Save</button>
+</div>
+```
+
+</>;
+}
+
 createRoot(document.getElementById('root')).render(<App/>);

@@ -15,6 +15,9 @@ def create_app(test_config=None):
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         MAX_CONTENT_LENGTH=int(os.getenv('MAX_UPLOAD_BYTES', 5 * 1024 * 1024)),
         UPLOAD_FOLDER=os.getenv('UPLOAD_FOLDER', os.path.join(app.instance_path, 'uploads')),
+    SUPABASE_URL=os.getenv('SUPABASE_URL'),
+    SUPABASE_SERVICE_ROLE_KEY=os.getenv('SUPABASE_SERVICE_ROLE_KEY'),
+    SUPABASE_BUCKET=os.getenv('SUPABASE_BUCKET', 'uploads'),
     )
     if test_config:
         app.config.update(test_config)
