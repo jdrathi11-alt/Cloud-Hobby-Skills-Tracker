@@ -1,0 +1,3 @@
+-- Production migration starting point. For a production build, mirror the SQLAlchemy models
+-- with UUID keys and Supabase RLS policies. Keep service-role credentials server-side only.
+-- Suggested buckets: profile-images (private), achievement-files (private/public-by-signed-url).

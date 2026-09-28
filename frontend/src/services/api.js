@@ -1,0 +1,3 @@
+const BASE=import.meta.env.VITE_API_URL||'http://localhost:5000/api';
+export async function api(path,options={}){const token=localStorage.getItem('token'); const headers={...(options.headers||{})}; if(token) headers.Authorization=`Bearer ${token}`; if(options.body && !(options.body instanceof FormData)) headers['Content-Type']='application/json'; const r=await fetch(BASE+path,{...options,headers}); const data=await r.json().catch(()=>({})); if(!r.ok) throw new Error(data.error||`HTTP ${r.status}`); return data}
+export const auth={register:(d)=>api('/register',{method:'POST',body:JSON.stringify(d)}),login:(d)=>api('/login',{method:'POST',body:JSON.stringify(d)})};

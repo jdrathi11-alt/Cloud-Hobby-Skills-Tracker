@@ -1,0 +1,16 @@
+services:
+  backend:
+    build: ./backend
+    ports: ["5000:5000"]
+    environment:
+      DATABASE_URL: sqlite:///hobby_tracker.db
+      SECRET_KEY: docker-dev-secret
+      JWT_SECRET: docker-jwt-secret
+      FRONTEND_ORIGIN: http://localhost:5173
+    volumes: ["./backend:/app"]
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports: ["5173:5173"]
+    volumes: ["./frontend:/app"]
