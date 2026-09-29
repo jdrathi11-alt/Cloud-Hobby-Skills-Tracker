@@ -100,13 +100,46 @@ def delete_skill(user,sid):
 @api.post('/goals')
 @login_required
 def create_goal(user):
-    d=request.get_json() or {}; s=Skill.query.filter_by(id=d.get('skill_id'),user_id=user.id).first()
-    if not s: return jsonify({'error':'Skill not found'}),404
-    g=Goal(user_id=user.id,skill_id=s.id,title=d.get('title',''),target_value=float(d.get('target_value',0)),unit=d.get('unit','hours'),deadline=parse_date(d.get('deadline')),status='ACTIVE')
-    db.session.add(g); db.session.commit()
-    for value in d.get('milestones',[]): db.session.add(Milestone(goal_id=g.id,title=f'{value} {g.unit}',target_value=float(value)))
-    db.session.commit(); return jsonify(goal_json(g)),201
+    d = request.get_json() or {}
 
+    try:
+        skill_id = int(d.get('skill_id'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Valid skill_id is required'}), 400
+
+    s = Skill.query.filter_by(
+        id=skill_id,
+        user_id=user.id
+    ).first()
+
+    if not s:
+        return jsonify({'error': 'Skill not found'}), 404
+
+    g = Goal(
+        user_id=user.id,
+        skill_id=s.id,
+        title=d.get('title', ''),
+        target_value=float(d.get('target_value', 0)),
+        unit=d.get('unit', 'hours'),
+        deadline=parse_date(d.get('deadline')),
+        status='ACTIVE'
+    )
+
+    db.session.add(g)
+    db.session.commit()
+
+    for value in d.get('milestones', []):
+        db.session.add(
+            Milestone(
+                goal_id=g.id,
+                title=f'{value} {g.unit}',
+                target_value=float(value)
+            )
+        )
+
+    db.session.commit()
+
+    return jsonify(goal_json(g)), 201
 def goal_json(g):
     pct=min(100, round((g.current_value/g.target_value*100) if g.target_value else 0,1)); ms=Milestone.query.filter_by(goal_id=g.id).all()
     return {'id':g.id,'skill_id':g.skill_id,'title':g.title,'target_value':g.target_value,'current_value':g.current_value,'unit':g.unit,'deadline':g.deadline.isoformat() if g.deadline else None,'status':g.status,'progress':pct,'milestones':[{'id':m.id,'title':m.title,'target_value':m.target_value,'achieved':m.achieved,'achieved_at':m.achieved_at.isoformat() if m.achieved_at else None} for m in ms]}
@@ -129,15 +162,65 @@ def update_goal(user,gid):
 @api.post('/practice')
 @login_required
 def practice(user):
-    d=request.get_json() or {}; s=Skill.query.filter_by(id=d.get('skill_id'),user_id=user.id).first()
-    if not s or int(d.get('duration_minutes',0))<=0: return jsonify({'error':'Valid skill and positive duration required'}),400
-    p=PracticeSession(user_id=user.id,skill_id=s.id,duration_minutes=int(d['duration_minutes']),activity=d.get('activity','Practice'),notes=d.get('notes',''),practiced_at=datetime.fromisoformat(d['practiced_at'].replace('Z','+00:00')) if d.get('practiced_at') else datetime.now(timezone.utc))
-    db.session.add(p); db.session.flush()
-    for g in Goal.query.filter_by(user_id=user.id,skill_id=s.id,status='ACTIVE').all(): g.current_value += p.duration_minutes/60; g.status='COMPLETED' if g.current_value>=g.target_value else g.status
-    db.session.commit(); return jsonify({'id':p.id,'message':'Practice logged','dashboard':dashboard(user.id)}),201
+    d = request.get_json() or {}
 
-@api.get('/practice')
-@login_required
+    try:
+        skill_id = int(d.get('skill_id'))
+        duration_minutes = int(d.get('duration_minutes', 0))
+    except (TypeError, ValueError):
+        return jsonify({
+            'error': 'Valid skill_id and duration_minutes are required'
+        }), 400
+
+    if duration_minutes <= 0:
+        return jsonify({
+            'error': 'Duration must be greater than zero'
+        }), 400
+
+    s = Skill.query.filter_by(
+        id=skill_id,
+        user_id=user.id
+    ).first()
+
+    if not s:
+        return jsonify({'error': 'Skill not found'}), 404
+
+    practiced_at = (
+        datetime.fromisoformat(
+            d['practiced_at'].replace('Z', '+00:00')
+        )
+        if d.get('practiced_at')
+        else datetime.now(timezone.utc)
+    )
+
+    p = PracticeSession(
+        user_id=user.id,
+        skill_id=s.id,
+        duration_minutes=duration_minutes,
+        activity=d.get('activity', 'Practice'),
+        notes=d.get('notes', ''),
+        practiced_at=practiced_at
+    )
+
+    db.session.add(p)
+    db.session.flush()
+
+    for g in Goal.query.filter_by(
+        user_id=user.id,
+        skill_id=s.id,
+        status='ACTIVE'
+    ).all():
+        g.current_value += duration_minutes / 60
+        if g.current_value >= g.target_value:
+            g.status = 'COMPLETED'
+
+    db.session.commit()
+
+    return jsonify({
+        'id': p.id,
+        'message': 'Practice logged',
+        'dashboard': dashboard(user.id)
+    }), 201
 def get_practice(user):
     rows=PracticeSession.query.filter_by(user_id=user.id).order_by(PracticeSession.practiced_at.desc()).all(); return jsonify([{'id':r.id,'skill_id':r.skill_id,'duration_minutes':r.duration_minutes,'activity':r.activity,'notes':r.notes,'practiced_at':r.practiced_at.isoformat()} for r in rows])
 
